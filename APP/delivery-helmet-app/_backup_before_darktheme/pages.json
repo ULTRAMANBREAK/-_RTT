@@ -1,0 +1,40 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/login",
+      "style": { "navigationBarTitleText": "登录", "navigationBarBackgroundColor": "#FF6B35", "navigationBarTextStyle": "white", "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/index/index",
+      "style": { "navigationBarTitleText": "智能外卖APP", "navigationBarBackgroundColor": "#FF6B35", "navigationBarTextStyle": "white" }
+    },
+    {
+      "path": "pages/map/map",
+      "style": { "navigationBarTitleText": "配送地图", "navigationBarBackgroundColor": "#FF6B35", "navigationBarTextStyle": "white" }
+    },
+    {
+      "path": "pages/device/device",
+      "style": { "navigationBarTitleText": "设备状态", "navigationBarBackgroundColor": "#FF6B35", "navigationBarTextStyle": "white" }
+    },
+    {
+      "path": "pages/order/order",
+      "style": { "navigationBarTitleText": "订单管理", "navigationBarBackgroundColor": "#FF6B35", "navigationBarTextStyle": "white" }
+    }
+  ],
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#FF6B35",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/index/index",    "text": "首页" },
+      { "pagePath": "pages/map/map",        "text": "地图" },
+      { "pagePath": "pages/device/device",  "text": "设备" },
+      { "pagePath": "pages/order/order",    "text": "订单" }
+    ]
+  },
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarBackgroundColor": "#FF6B35",
+    "backgroundColor": "#f5f5f5"
+  }
+}

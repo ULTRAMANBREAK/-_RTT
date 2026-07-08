@@ -37,7 +37,9 @@
 
 ### APP — 移动端
 
-原 HBuilderX 工程目录。`APP/HBuilderX/` 是 IDE 本体（约 500MB），已通过 `.gitignore` 排除，不进入仓库。
+`APP/delivery-helmet-app/` 是外卖头盔配套的 **uni-app** 移动端项目（Vue 语法），含页面（登录 / 地图 / 订单 / 设备）、MQTT 通讯工具、跌落告警等组件。用 HBuilderX 打开该目录即可运行到 App / H5 / 小程序。
+
+`APP/HBuilderX/`（IDE 本体，约 500MB）与 `unpackage/`（编译产物）均在 `.gitignore` 中排除，不进入仓库。
 
 ## 构建与烧录
 
