@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能外卖箱 · 管理后台</title>
+<script src="https://webapi.amap.com/maps?v=2.0&key=8467e12fac1e7395757e4c98468a55ce"></script>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<style>
+/* ============================================================
+   智能外卖箱管理后台 — 专业深蓝 · 左侧导航 · 多页面
+   ============================================================ */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  /* 侧边栏/顶栏用深藏蓝 */
+  --nav-bg: #1b2b4b;
+  --nav-bg2: #162240;
+  --sb-w: 190px;
+  --hd-h: 56px;
+  --ft-h: 38px;
+
+  /* 卡片：纯白 */
+  --card: #ffffff;
+  --card-border: #dde3ec;
+  --glass: rgba(255,255,255,0.85);
+  --glass-b: #e8edf4;
+
+  /* 正文文字 */
+  --t1:#1a2942; --t2:#4a5a72; --t3:rgba(26,41,66,0.50); --t4:rgba(26,41,66,0.28);
+  /* 导航栏白色文字 */
+  --w1:rgba(255,255,255,0.95); --w2:rgba(255,255,255,0.60); --w3:rgba(255,255,255,0.30);
+
+  /* 功能色 */
+  --blue:#1565C0; --green:#2e7d32; --red:#c62828;
+  --orange:#e65100; --purple:#1976D2; --teal:#00838f;
+
+  --g-blue:  linear-gradient(135deg,#1565C0,#1976D2);
+  --g-green: linear-gradient(135deg,#2e7d32,#43a047);
+  --g-red:   linear-gradient(135deg,#c62828,#ef5350);
+  --g-orange:linear-gradient(135deg,#e65100,#ff7043);
+  --g-purple:linear-gradient(135deg,#1565C0,#42A5F5);
+  --g-teal:  linear-gradient(135deg,#00838f,#26c6da);
+
+  --sh-sm:0 1px 4px rgba(0,0,0,0.08);
+  --sh:   0 2px 12px rgba(0,0,0,0.09),0 1px 3px rgba(0,0,0,0.06);
+  --sh-lg:0 6px 24px rgba(0,0,0,0.12),0 2px 6px rgba(0,0,0,0.07);
+
+  --r:16px; --r-sm:10px; --r-xs:6px;
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Helvetica Neue',sans-serif;
+  --dur:0.22s; --ease:cubic-bezier(0.4,0,0.2,1); --spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+
+body {
+  font-family: var(--font);
+  background: #eef1f6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== Header ===== */
+.hd {
+  position: fixed; top:0; left:0; right:0; z-index:300;
+  height: var(--hd-h);
+  background: var(--nav-bg);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px 0 calc(var(--sb-w) + 22px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.hd-left { display:flex; align-items:center; gap:12px; }
+
+.hd-page-title {
+  font-size: 18px; font-weight: 700;
+  color: var(--w1); letter-spacing: -0.3px;
+}
+
+.hd-page-sub {
+  font-size: 11px; color: var(--w2);
+  background: rgba(255,255,255,0.12);
+  padding: 2px 8px; border-radius: 8px;
+  font-weight: 500;
+}
+
+.hd-right { display:flex; align-items:center; gap:14px; }
+
+.mqtt-pill {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 12px; border-radius:20px;
+  font-size:12px; font-weight:600;
+  border:1px solid transparent;
+  transition: all var(--dur) var(--ease);
+  background: rgba(255,255,255,0.07); color:var(--w2);
+}
+.mqtt-pill.on  { background:rgba(16,185,129,0.18); color:#34D399; border-color:rgba(52,211,153,0.22); }
+.mqtt-pill.off { background:rgba(239,68,68,0.18);  color:#F87171; border-color:rgba(248,113,113,0.22); }
+.mqtt-pill.re  { background:rgba(245,158,11,0.18); color:#FCD34D; border-color:rgba(252,211,77,0.22); }
+
+.sdot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+.sdot.pulse { animation:blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.clock {
+  font-size:14px; font-weight:500; color:var(--w1);
+  font-variant-numeric:tabular-nums; letter-spacing:1px;
+}
+
+/* ===== Sidebar ===== */
+.sb {
+  position: fixed; top:0; left:0; bottom:0; z-index:400;
+  width: var(--sb-w);
+  background: var(--nav-bg2);
+  border-right: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 2px 0 12px rgba(0,0,0,0.18);
+  display: flex; flex-direction:column;
+  padding: 0 10px 20px;
+}
+
+.sb-brand {
+  display:flex; align-items:center; gap:10px;
+  padding: 14px 8px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 10px;
+}
+
+.sb-logo {
+  width:36px; height:36px;
+  background: linear-gradient(145deg,#FF9F0A,#FF5E00);
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:19px; flex-shrink:0;
+  box-shadow: 0 3px 12px rgba(255,94,0,0.40);
+}
+
+.sb-brand-text { display:flex; flex-direction:column; gap:1px; }
+.sb-brand-name { font-size:14px; font-weight:700; color:var(--w1); letter-spacing:-0.2px; }
+.sb-brand-sub  { font-size:9px;  font-weight:400; color:var(--w3); letter-spacing:0.2px; }
+
+.sb-section-label {
+  font-size:9px; font-weight:700; color:var(--w3);
+  text-transform:uppercase; letter-spacing:1px;
+  padding: 0 10px; margin: 14px 0 6px;
+}
+
+.sb-item {
+  display:flex; align-items:center; gap:10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  color: var(--w2);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all var(--dur) var(--ease);
+  user-select: none;
+}
+
+.sb-item:hover { background:rgba(255,255,255,0.09); color:var(--w1); }
+
+.sb-item.active {
+  background: linear-gradient(135deg,#1565C0,#1976D2);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(21,101,192,0.40);
+}
+
+.sb-item-icon { font-size:17px; flex-shrink:0; line-height:1; }
+.sb-item-badge {
+  margin-left:auto; font-size:10px; font-weight:700;
+  background:rgba(255,255,255,0.15); color:var(--w1);
+  padding:1px 6px; border-radius:8px;
+}
+
+.sb-item.active .sb-item-badge { background:rgba(255,255,255,0.25); }
+
+.sb-bottom {
+  margin-top:auto;
+  padding-top:14px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.sb-status-row {
+  display:flex; align-items:center; gap:8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.sb-status-dot { width:8px; height:8px; border-radius:50%; background:#34D399; flex-shrink:0; }
+.sb-status-dot.off { background:#F87171; }
+.sb-status-text { font-size:11px; font-weight:500; color:var(--w2); }
+
+/* ===== Layout ===== */
+.layout {
+  margin-left: var(--sb-w);
+  margin-top: var(--hd-h);
+  height: calc(100vh - var(--hd-h) - var(--ft-h));
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== Pages ===== */
+.page {
+  display: none;
+  width:100%; height:100%;
+}
+
+.page.active { display:flex; flex-direction:column; }
+
+/* ===== 跌倒专属全屏警报 ===== */
+.fall-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(80,0,0,0.92);
+  align-items: center; justify-content: center;
+  animation: fall-bg-pulse 1.2s ease-in-out infinite;
+}
+.fall-overlay.show { display: flex; }
+@keyframes fall-bg-pulse {
+  0%,100% { background: rgba(80,0,0,0.92); }
+  50%     { background: rgba(130,0,0,0.95); }
+}
+.fall-modal {
+  background: #1a0000;
+  border: 3px solid #ff3333;
+  border-radius: 24px;
+  width: 560px; max-width: 90vw;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(255,0,0,0.6), 0 0 120px rgba(255,0,0,0.3);
+  animation: fall-shake 0.5s ease both, fall-border-pulse 1.5s ease-in-out infinite 0.5s;
+}
+@keyframes fall-shake {
+  0%,100%{ transform:translateX(0); }
+  20%    { transform:translateX(-10px); }
+  40%    { transform:translateX(10px); }
+  60%    { transform:translateX(-6px); }
+  80%    { transform:translateX(6px); }
+}
+@keyframes fall-border-pulse {
+  0%,100% { box-shadow:0 0 40px rgba(255,0,0,0.4),0 0 80px rgba(255,0,0,0.2); }
+  50%     { box-shadow:0 0 80px rgba(255,0,0,0.8),0 0 160px rgba(255,0,0,0.5); }
+}
+.fall-flash-bar {
+  height: 7px;
+  background: linear-gradient(90deg,#ff0000,#ff6b6b,#ff0000);
+  background-size: 200% 100%;
+  animation: fall-bar 0.8s linear infinite;
+}
+@keyframes fall-bar { from{background-position:0%} to{background-position:200%} }
+.fall-modal-body {
+  padding: 48px 48px 40px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.fall-big-icon {
+  font-size: 90px; line-height: 1;
+  animation: fall-icon-pulse 0.8s ease-in-out infinite;
+  margin-bottom: 20px;
+}
+@keyframes fall-icon-pulse {
+  0%,100%{ transform:scale(1); } 50%{ transform:scale(1.15); }
+}
+.fall-big-title {
+  font-size: 56px; font-weight: 900; letter-spacing: 4px;
+  color: #ff3333;
+  animation: fall-text-blink 0.7s ease-in-out infinite;
+  margin-bottom: 12px;
+}
+@keyframes fall-text-blink {
+  0%,100%{ opacity:1; } 50%{ opacity:0.55; }
+}
+.fall-big-desc {
+  font-size: 20px; color: rgba(255,255,255,0.85);
+  text-align: center; line-height: 1.7;
+  margin-bottom: 8px;
+}
+.fall-big-time {
+  font-size: 13px; color: rgba(255,120,120,0.7);
+  margin-bottom: 32px;
+}
+.fall-divider { width:100%; height:1px; background:rgba(255,50,50,0.3); margin-bottom:28px; }
+.fall-close-btn {
+  width: 100%; padding: 18px 0;
+  background: linear-gradient(135deg,#c62828,#ef5350);
+  border: none; border-radius: 14px; cursor: pointer;
+  font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 2px;
+  box-shadow: 0 4px 20px rgba(198,40,40,0.5);
+  transition: opacity 0.15s;
+}
+.fall-close-btn:hover { opacity: 0.85; }
+
+/* ===== Alarm Overlay（全局浮层，任何页面都可见）===== */
+.alarm-overlay {
+  position: fixed;
+  top: calc(var(--hd-h) + 12px);
+  right: 18px;
+  width: 340px;
+  z-index: 500;
+  display: none;
+}
+
+.alarm-overlay.show {
+  display: block;
+  animation: alarmIn var(--dur) var(--spring);
+}
+
+@keyframes alarmIn {
+  from { opacity:0; transform:translateX(20px) scale(0.97); }
+  to   { opacity:1; transform:translateX(0) scale(1); }
+}
+
+.alarm-card {
+  background: rgba(254,226,226,0.96);
+  border-radius:16px; overflow:hidden;
+  box-shadow: 0 8px 32px rgba(239,68,68,0.25);
+  border: 1.5px solid rgba(239,68,68,0.25);
+}
+
+.alarm-stripe { height:3px; background:linear-gradient(90deg,#EF4444,#F87171); }
+
+.alarm-inner {
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px;
+}
+
+.alarm-ring {
+  width:42px; height:42px; border-radius:13px;
+  background:rgba(239,68,68,0.12);
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; flex-shrink:0;
+}
+
+.alarm-body { flex:1; min-width:0; }
+.alarm-title { font-size:14px; font-weight:700; color:#B91C1C; }
+.alarm-desc  { font-size:11px; color:#991B1B; margin-top:3px; line-height:1.4; }
+
+.alarm-close {
+  width:28px; height:28px; border-radius:50%;
+  border:none; background:rgba(239,68,68,0.12); color:#B91C1C;
+  font-size:12px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:background var(--dur) var(--ease);
+}
+.alarm-close:hover { background:rgba(239,68,68,0.25); }
+
+/* ===== 卡片通用 ===== */
+.card {
+  background: var(--card);
+  border-radius: var(--r);
+  box-shadow: var(--sh);
+  border: 1px solid var(--card-border);
+  overflow: hidden;
+}
+
+.card-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 16px 18px 10px;
+}
+
+.card-title { font-size:15px; font-weight:700; color:var(--t1); letter-spacing:-0.2px; }
+
+.card-chip {
+  font-size:11px; font-weight:700;
+  padding:3px 9px; border-radius:12px;
+}
+
+.card-body { padding:0 18px 18px; }
+
+/* ===== PAGE 1: 地图 ===== */
+#page-map { flex-direction: column; padding: 14px; gap: 12px; }
+
+.map-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.stat-chip {
+  background: #ffffff;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--sh-sm);
+  transition: box-shadow var(--dur) var(--ease);
+}
+
+.stat-chip:hover { box-shadow: var(--sh); }
+
+.stat-icon-box {
+  width: 40px; height: 40px; border-radius: 12px;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 20px; flex-shrink:0;
+}
+
+.stat-icon-box.blue   { background: rgba(59,130,246,0.25); }
+.stat-icon-box.green  { background: rgba(16,185,129,0.25); }
+.stat-icon-box.orange { background: rgba(245,158,11,0.25); }
+.stat-icon-box.purple { background: rgba(139,92,246,0.25); }
+
+.stat-body { min-width:0; }
+
+.stat-val {
+  font-size: 22px; font-weight: 800;
+  color: var(--t1); line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+
+.stat-label { font-size: 11px; color: var(--t2); margin-top: 3px; font-weight: 500; }
+
+.map-wrap {
+  flex:1; min-height:0;
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--sh-lg);
+  border: 1px solid var(--card-border);
+  position: relative;
+}
+
+#map { width:100%; height:100%; }
+
+.map-info-overlay {
+  position:absolute; top:14px; left:14px;
+  background: rgba(255,255,255,0.96);
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  border-radius:var(--r-sm);
+  padding:12px 16px;
+  border:1px solid var(--card-border);
+  box-shadow:var(--sh);
+}
+
+.mio-row { display:flex; align-items:center; gap:8px; }
+.mio-row+.mio-row { margin-top:8px; padding-top:8px; border-top:1px solid var(--card-border); }
+.mio-icon { font-size:15px; flex-shrink:0; }
+.mio-lbl { font-size:9px; font-weight:600; color:var(--t3); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:1px; }
+.mio-val { font-size:13px; font-weight:700; color:#1565C0; font-variant-numeric:tabular-nums; }
+
+/* ===== PAGE 2: 订单管理 ===== */
+#page-orders {
+  padding: 20px;
+  gap: 16px;
+  flex-direction: row;
+  align-items: flex-start;
+  overflow: hidden;
+}
+
+.orders-form-col {
+  width: 360px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  height: 100%;
+  padding-right: 2px;
+  scrollbar-width: none;
+}
+
+.orders-form-col::-webkit-scrollbar { display:none; }
+
+.orders-list-col {
+  flex:1; min-width:0;
+  overflow-y: auto;
+  height: 100%;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+.orders-list-col::-webkit-scrollbar { width:4px; }
+.orders-list-col::-webkit-scrollbar-track { background:transparent; }
+.orders-list-col::-webkit-scrollbar-thumb { background:rgba(26,41,66,0.15); border-radius:2px; }
+
+/* 表单元素 */
+.fi {
+  width:100%;
+  background: rgba(30,20,60,0.06);
+  border: 1.5px solid rgba(30,20,60,0.10);
+  border-radius: var(--r-sm);
+  padding:9px 12px;
+  color:var(--t1); font-size:13px; font-family:var(--font);
+  outline:none;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease);
+  -webkit-appearance:none;
+}
+.fi:focus { border-color:#1565C0; background:rgba(21,101,192,0.04); }
+.fi::placeholder { color:var(--t4); }
+.fi.sel {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 11px center;
+  padding-right:30px; cursor:pointer;
+}
+.fi.sel option { background:#fff; color:#000; }
+
+.frow { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+.frow.one { grid-template-columns:1fr; }
+.frow:last-child { margin-bottom:0; }
+
+.clip-hint {
+  width:100%;
+  background:rgba(21,101,192,0.07); border:1.5px solid rgba(21,101,192,0.16);
+  border-radius:var(--r-sm); padding:9px 12px;
+  font-size:11px; color:#1565C0; font-weight:600;
+  display:flex; align-items:center; gap:6px;
+}
+
+.btn-add {
+  width:100%;
+  background: linear-gradient(135deg,#1565C0,#1976D2);
+  border:none; border-radius:var(--r-sm); padding:10px;
+  color:#fff; font-size:14px; font-family:var(--font); font-weight:700;
+  cursor:pointer; margin-top:9px;
+  box-shadow:0 4px 14px rgba(21,101,192,0.35);
+  transition: opacity var(--dur) var(--ease), transform 0.12s;
+}
+.btn-add:hover  { opacity:0.91; }
+.btn-add:active { transform:scale(0.99); }
+
+/* 订单条目 */
+.order-list { display:flex; flex-direction:column; }
+
+.oitem {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:13px 0; border-bottom:1px solid rgba(30,20,60,0.07);
+}
+.oitem:first-child { padding-top:2px; }
+.oitem:last-child  { border-bottom:none; padding-bottom:2px; }
+
+.onum {
+  width:34px; height:34px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px; font-weight:800; color:#fff;
+  flex-shrink:0; margin-top:1px; box-shadow:var(--sh-sm);
+}
+.onum.p { background:var(--g-blue); }
+.onum.a { background:var(--g-orange); }
+.onum.v { background:var(--g-green); }
+.onum.d { background:rgba(30,20,60,0.12); color:var(--t3); box-shadow:none; }
+
+.oinfo { flex:1; min-width:0; }
+.ofood { font-size:15px; font-weight:700; color:var(--t1); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oroute { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--t3); margin-bottom:4px; }
+.rtag { font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; flex-shrink:0; }
+.rtag.p { background:rgba(245,158,11,0.14); color:#B45309; }
+.rtag.d { background:rgba(59,130,246,0.12); color:#2563EB; }
+.otimer { font-size:12px; font-weight:600; color:var(--green); font-variant-numeric:tabular-nums; }
+.otimer.ov { color:var(--red); }
+
+.oright { display:flex; flex-direction:column; align-items:flex-end; gap:5px; flex-shrink:0; }
+.obadge { font-size:10px; font-weight:700; padding:3px 8px; border-radius:10px; white-space:nowrap; }
+.obadge.p { background:rgba(59,130,246,0.12); color:#2563EB; }
+.obadge.a { background:rgba(245,158,11,0.14); color:#D97706; }
+.obadge.v { background:rgba(16,185,129,0.13); color:#059669; }
+.obadge.c { background:rgba(16,185,129,0.13); color:#059669; }
+.oacts { display:flex; gap:4px; flex-wrap:wrap; justify-content:flex-end; }
+
+.bxs {
+  font-size:11px; font-weight:600; padding:4px 9px; border-radius:7px;
+  cursor:pointer; border:none; font-family:var(--font);
+  transition:background var(--dur) var(--ease);
+}
+.bxs.u { background:rgba(245,158,11,0.12); color:#D97706; }
+.bxs.u:hover { background:rgba(245,158,11,0.22); }
+.bxs.n { background:rgba(16,185,129,0.12); color:#059669; }
+.bxs.n:hover { background:rgba(16,185,129,0.22); }
+.bxs.x { background:rgba(30,20,60,0.07); color:var(--t3); }
+.bxs.x:hover { background:rgba(239,68,68,0.10); color:#DC2626; }
+
+.order-empty { text-align:center; padding:30px 0 10px; color:var(--t3); font-size:13px; }
+
+/* ===== PAGE 3: 温度监控 ===== */
+#page-temp { padding:20px; gap:16px; overflow-y:auto; flex-direction:column; }
+
+.temp-header-row {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-shrink:0;
+}
+
+.temp-header-title { font-size:22px; font-weight:800; color:var(--t1); letter-spacing:-0.4px; }
+.temp-header-sub   { font-size:13px; color:var(--t2); margin-top:4px; }
+
+.temp-main-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 14px;
+  flex: 1;
+}
+
+.tcard {
+  border-radius: var(--r);
+  padding: 24px 22px 20px;
+  display: flex; flex-direction:column;
+  position:relative; overflow:hidden;
+  box-shadow: var(--sh);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+
+.tcard:hover { transform:translateY(-2px); box-shadow:var(--sh-lg); }
+
+.tcard.fl { background:linear-gradient(145deg,#f0fdf4,#d1fae5); border:1px solid rgba(16,185,129,0.20); }
+.tcard.fr { background:linear-gradient(145deg,#eff6ff,#dbeafe); border:1px solid rgba(59,130,246,0.20); }
+.tcard.bl { background:linear-gradient(145deg,#fffbeb,#fef3c7); border:1px solid rgba(245,158,11,0.20); }
+.tcard.br { background:linear-gradient(145deg,#fdf4ff,#f5d0fe); border:1px solid rgba(168,85,247,0.20); }
+.tcard.warn   { background:linear-gradient(145deg,#fffbeb,#fef3c7); border:1.5px solid rgba(245,158,11,0.35) !important; }
+.tcard.danger { background:linear-gradient(145deg,#fef2f2,#fecaca); border:1.5px solid rgba(239,68,68,0.35) !important; }
+
+/* 背景装饰圆 */
+.tcard::after {
+  content:''; position:absolute; top:-30px; right:-30px;
+  width:100px; height:100px; border-radius:50%;
+  opacity:0.12; transition:opacity var(--dur) var(--ease);
+}
+.tcard.fl::after { background:#059669; }
+.tcard.fr::after { background:#2563EB; }
+.tcard.bl::after { background:#D97706; }
+.tcard.br::after { background:#7C3AED; }
+.tcard.warn::after   { background:#D97706; opacity:0.18; }
+.tcard.danger::after { background:#DC2626; opacity:0.18; }
+
+.tcard-icon { font-size:34px; line-height:1; margin-bottom:12px; z-index:1; position:relative; }
+
+.tcard-val {
+  font-size:52px; font-weight:900; line-height:1;
+  letter-spacing:-2px; font-variant-numeric:tabular-nums;
+  color:var(--t1); margin-bottom:6px;
+  z-index:1; position:relative;
+}
+.tcard-val .u { font-size:24px; font-weight:600; letter-spacing:0; opacity:0.7; }
+.tcard.warn   .tcard-val { color:#92400E; }
+.tcard.danger .tcard-val { color:#991B1B; }
+
+.tcard-label {
+  font-size:12px; font-weight:700; color:var(--t3);
+  text-transform:uppercase; letter-spacing:0.8px;
+  margin-bottom:14px; z-index:1; position:relative;
+}
+
+.tcard-bar {
+  height:4px; border-radius:2px;
+  background:rgba(30,20,60,0.09); overflow:hidden;
+  z-index:1; position:relative;
+}
+.tcard-bar-fill { height:100%; border-radius:2px; transition:width 0.7s var(--ease); }
+.tcard.fl .tcard-bar-fill { background:var(--g-green); }
+.tcard.fr .tcard-bar-fill { background:var(--g-blue); }
+.tcard.bl .tcard-bar-fill { background:var(--g-orange); }
+.tcard.br .tcard-bar-fill { background:var(--g-purple); }
+.tcard.warn   .tcard-bar-fill { background:var(--g-orange); }
+.tcard.danger .tcard-bar-fill { background:var(--g-red); }
+
+.tcard-status {
+  position:absolute; top:18px; right:18px;
+  font-size:10px; font-weight:700; padding:3px 9px; border-radius:10px;
+  z-index:2;
+}
+.tcard-status.ok     { background:rgba(16,185,129,0.15); color:#059669; }
+.tcard-status.warn   { background:rgba(245,158,11,0.18); color:#B45309; }
+.tcard-status.danger { background:rgba(239,68,68,0.18);  color:#B91C1C; }
+
+/* ===== PAGE 4: 设备状态 ===== */
+#page-device { padding:20px; flex-direction:column; gap:16px; overflow-y:auto; }
+
+.device-section-title {
+  font-size:22px; font-weight:800; color:var(--t1); letter-spacing:-0.4px; flex-shrink:0;
+}
+
+.device-grid {
+  display:grid; grid-template-columns:repeat(2,1fr); gap:14px; flex-shrink:0;
+}
+
+.dcard {
+  border-radius:var(--r); padding:20px;
+  background:var(--card);
+  border:1px solid var(--card-border);
+  box-shadow:var(--sh);
+  display:flex; flex-direction:column; gap:14px;
+  transition:all var(--dur) var(--ease);
+}
+
+.dcard.ok     { border-color:rgba(16,185,129,0.25); background:linear-gradient(145deg,#f0fdf4,#ecfdf5); }
+.dcard.alarm  { border-color:rgba(239,68,68,0.35);  background:linear-gradient(145deg,#fef2f2,#fee2e2); animation:dPulse 1.8s ease-in-out infinite; }
+.dcard.warn   { border-color:rgba(245,158,11,0.30); background:linear-gradient(145deg,#fffbeb,#fef9c3); }
+.dcard.neutral{ border-color:rgba(21,101,192,0.20); background:linear-gradient(145deg,#eff6ff,#e0f0ff); }
+
+@keyframes dPulse { 0%,100%{box-shadow:var(--sh)} 50%{box-shadow:0 0 0 4px rgba(239,68,68,0.12),var(--sh)} }
+
+.dcard-top { display:flex; align-items:center; justify-content:space-between; }
+
+.dcard-icon-box {
+  width:48px; height:48px; border-radius:14px;
+  background:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:24px; flex-shrink:0; box-shadow:var(--sh-sm);
+}
+
+.dcard-badge {
+  font-size:11px; font-weight:700;
+  padding:4px 10px; border-radius:10px;
+}
+.dcard-badge.ok     { background:rgba(16,185,129,0.15); color:#059669; }
+.dcard-badge.alarm  { background:rgba(239,68,68,0.18);  color:#B91C1C; }
+.dcard-badge.warn   { background:rgba(245,158,11,0.18); color:#D97706; }
+.dcard-badge.neutral{ background:rgba(21,101,192,0.12); color:#1565C0; }
+
+.dcard-name { font-size:12px; font-weight:600; color:var(--t3); margin-bottom:4px; }
+.dcard-val  { font-size:22px; font-weight:800; color:var(--t1); letter-spacing:-0.3px; }
+.dcard.ok    .dcard-val { color:#059669; }
+.dcard.alarm .dcard-val { color:#B91C1C; }
+.dcard.warn  .dcard-val { color:#D97706; }
+
+/* ===== Footer ===== */
+.ft {
+  position:fixed; bottom:0; left:var(--sb-w); right:0;
+  height:var(--ft-h);
+  background:#ffffff;
+  border-top:1px solid var(--card-border);
+  display:flex; align-items:center; padding:0 20px; gap:0;
+  font-size:11px; color:var(--t3);
+  box-shadow: 0 -1px 6px rgba(0,0,0,0.06);
+}
+
+.fitem { display:flex; align-items:center; gap:5px; padding:0 16px; border-right:1px solid var(--card-border); line-height:1; }
+.fitem:first-child { padding-left:0; }
+.fitem:last-child  { border-right:none; }
+.fval { font-weight:700; color:var(--t1); font-variant-numeric:tabular-nums; }
+
+/* ===== 登录遮罩 ===== */
+#loginMask {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(150deg,#0f1f3d 0%,#1b2b4b 40%,#1e3a5f 70%,#1565C0 100%);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+#loginMask.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.login-box {
+  background: rgba(20,40,74,0.96);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 24px;
+  padding: 48px 40px 40px;
+  width: 360px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.50);
+  will-change: transform, opacity;
+  animation: loginIn 0.36s ease-out both;
+}
+@keyframes loginIn { from { opacity:0; transform:translateY(24px) } to { opacity:1; transform:translateY(0) } }
+
+.login-logo { font-size: 52px; text-align: center; margin-bottom: 8px; }
+.login-title { text-align: center; color: #fff; font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.login-sub   { text-align: center; color: rgba(255,255,255,0.45); font-size: 13px; margin-bottom: 36px; }
+
+.login-label { color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 600;
+               letter-spacing: 0.5px; margin-bottom: 8px; display: block; }
+.login-input {
+  width: 100%; padding: 13px 16px;
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 12px; color: #fff; font-size: 15px;
+  outline: none; transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 18px;
+}
+.login-input::placeholder { color: rgba(255,255,255,0.28); }
+.login-input:focus { border-color: rgba(139,92,246,0.8); background: rgba(255,255,255,0.12); }
+
+.login-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg,#1565C0,#1976D2);
+  border: none; border-radius: 14px;
+  color: #fff; font-size: 16px; font-weight: 800;
+  cursor: pointer; margin-top: 4px;
+  box-shadow: 0 8px 24px rgba(21,101,192,0.45);
+  transition: transform 0.15s, opacity 0.15s;
+}
+.login-btn:hover  { opacity: 0.9; transform: translateY(-1px); }
+.login-btn:active { transform: scale(0.98); }
+
+</style>
+</head>
+<body>
+
+<!-- ===== 登录遮罩 ===== -->
+<div id="loginMask">
+  <div class="login-box">
+    <div class="login-logo">📦</div>
+    <div class="login-title">智能外卖箱管理系统</div>
+    <div class="login-sub">Admin Dashboard · 请先登录</div>
+    <label class="login-label">账号</label>
+    <input id="loginUser" class="login-input" type="text" placeholder="请输入账号" autocomplete="off">
+    <label class="login-label">密码</label>
+    <input id="loginPass" class="login-input" type="password" placeholder="请输入密码" autocomplete="off"
+           onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">登 录</button>
+  </div>
+</div>
+
+<!-- ===== 侧边栏 ===== -->
+<aside class="sb">
+  <div class="sb-brand">
+    <div class="sb-logo">📦</div>
+    <div class="sb-brand-text">
+      <div class="sb-brand-name">外卖管理</div>
+      <div class="sb-brand-sub">Admin Dashboard</div>
+    </div>
+  </div>
+
+  <div class="sb-section-label">主菜单</div>
+
+  <div class="sb-item active" data-page="map" onclick="switchPage('map',this)">
+    <span class="sb-item-icon">🗺️</span>
+    <span>实时地图</span>
+    <span class="sb-item-badge" id="sbBadgeOrders">4</span>
+  </div>
+  <div class="sb-item" data-page="orders" onclick="switchPage('orders',this)">
+    <span class="sb-item-icon">📋</span>
+    <span>订单管理</span>
+  </div>
+  <div class="sb-item" data-page="temp" onclick="switchPage('temp',this)">
+    <span class="sb-item-icon">🌡️</span>
+    <span>温度监控</span>
+  </div>
+  <div class="sb-item" data-page="device" onclick="switchPage('device',this)">
+    <span class="sb-item-icon">⚙️</span>
+    <span>设备状态</span>
+  </div>
+
+  <div class="sb-bottom">
+    <div class="sb-status-row">
+      <div class="sb-status-dot off" id="sbDot"></div>
+      <div class="sb-status-text" id="sbStatus">MQTT 未连接</div>
+    </div>
+  </div>
+</aside>
+
+<!-- ===== Header ===== -->
+<div class="hd">
+  <div class="hd-left">
+    <span class="hd-page-title" id="hdTitle">实时地图</span>
+    <span class="hd-page-sub" id="hdSub">骑手追踪 · 配送概览</span>
+  </div>
+  <div class="hd-right">
+    <div class="mqtt-pill off" id="mqttPill">
+      <span class="sdot" id="mqttDot"></span>
+      <span id="mqttText">MQTT 未连接</span>
+    </div>
+    <span class="clock" id="clockText">--:--:--</span>
+  </div>
+</div>
+
+<!-- ===== 全局报警浮层 ===== -->
+<!-- 跌倒专属全屏警报 -->
+<div class="fall-overlay" id="fallOverlay">
+  <div class="fall-modal">
+    <div class="fall-flash-bar"></div>
+    <div class="fall-modal-body">
+      <div class="fall-big-icon">⚠️</div>
+      <div class="fall-big-title">跌倒警报！</div>
+      <div class="fall-big-desc">已检测到骑手发生跌倒<br>请立即联系骑手确认安全状况！<br><span style="font-size:1.1em;font-weight:800;letter-spacing:2px;">骑手电话号码：137xxxxxxxx</span></div>
+      <div class="fall-big-time" id="fallTime"></div>
+      <div class="fall-divider"></div>
+      <button class="fall-close-btn" onclick="closeFallOverlay()">✓ 确认处理，解除警报</button>
+    </div>
+    <div class="fall-flash-bar"></div>
+  </div>
+</div>
+
+<div class="alarm-overlay" id="alarmBanner">
+  <div class="alarm-card">
+    <div class="alarm-stripe"></div>
+    <div class="alarm-inner">
+      <div class="alarm-ring">🚨</div>
+      <div class="alarm-body">
+        <div class="alarm-title" id="alarmTitle">报警</div>
+        <div class="alarm-desc"  id="alarmDesc">检测到异常</div>
+      </div>
+      <button class="alarm-close" onclick="closeAlarm()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 主内容 ===== -->
+<div class="layout">
+
+  <!-- PAGE 1: 实时地图 -->
+  <div id="page-map" class="page active">
+    <!-- 顶部统计条 -->
+    <div class="map-stats-bar" style="padding:14px 14px 0; flex-shrink:0;">
+      <div class="stat-chip">
+        <div class="stat-icon-box blue">📦</div>
+        <div class="stat-body">
+          <div class="stat-val" id="statOrders">4</div>
+          <div class="stat-label">活跃订单</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-icon-box green">🛵</div>
+        <div class="stat-body">
+          <div class="stat-val" id="statSpeed">0.00 <span style="font-size:13px;opacity:0.7">m/s</span></div>
+          <div class="stat-label">骑手速度</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-icon-box orange">🌡️</div>
+        <div class="stat-body">
+          <div class="stat-val" id="statMinTemp">-- <span style="font-size:13px;opacity:0.7">°C</span></div>
+          <div class="stat-label">箱体平均温</div>
+        </div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-icon-box purple">📡</div>
+        <div class="stat-body">
+          <div class="stat-val" id="statConn" style="font-size:16px;">未连接</div>
+          <div class="stat-label">MQTT 状态</div>
+        </div>
+      </div>
+    </div>
+    <!-- 地图 -->
+    <div class="map-wrap" style="margin:12px 14px 14px; flex:1; min-height:0;">
+      <div id="map" style="width:100%;height:100%;"></div>
+      <div class="map-info-overlay">
+        <div class="mio-row">
+          <span class="mio-icon">🛵</span>
+          <div><div class="mio-lbl">骑手位置</div><div class="mio-val" id="coordText">等待定位…</div></div>
+        </div>
+        <div class="mio-row">
+          <span class="mio-icon">💨</span>
+          <div><div class="mio-lbl">当前速度</div><div class="mio-val" id="speedText">-- m/s</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 2: 订单管理 -->
+  <div id="page-orders" class="page">
+    <!-- 左：新建表单 -->
+    <div class="orders-form-col" style="padding:20px 8px 20px 20px;">
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-hd"><div class="card-title">新建订单</div></div>
+        <div class="card-body">
+          <div class="frow one"><input class="fi" id="iFood" placeholder="餐品名称（如：汉堡套餐）" /></div>
+          <div class="frow">
+            <select class="fi sel" id="iShop">
+              <option value="">— 选择取餐地点 —</option>
+              <option value="主教" data-lat="30.332095" data-lng="112.213667">主教（主教学楼）</option>
+              <option value="13教" data-lat="30.332700" data-lng="112.210300">13教（13号教学楼）</option>
+              <option value="7教"  data-lat="30.333024" data-lng="112.213930">7教（7号教学楼）</option>
+              <option value="万品汇" data-lat="30.331942" data-lng="112.215558">万品汇</option>
+            </select>
+            <select class="fi sel" id="iAddr">
+              <option value="">— 选择送达地点 —</option>
+              <option value="主教" data-lat="30.332095" data-lng="112.213667">主教（主教学楼）</option>
+              <option value="13教" data-lat="30.332700" data-lng="112.210300">13教（13号教学楼）</option>
+              <option value="7教"  data-lat="30.333024" data-lng="112.213930">7教（7号教学楼）</option>
+              <option value="万品汇" data-lat="30.331942" data-lng="112.215558">万品汇</option>
+            </select>
+          </div>
+          <div class="frow">
+            <input class="fi" id="iMins" placeholder="时限（分钟，默认30）" type="number" />
+            <div class="clip-hint">📎 夹子空闲优先</div>
+          </div>
+          <button class="btn-add" onclick="addOrder()">＋ 添加订单并推送</button>
+        </div>
+      </div>
+      <!-- 快速统计 -->
+      <div class="card">
+        <div class="card-hd"><div class="card-title">配送概览</div></div>
+        <div class="card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div style="background:rgba(59,130,246,0.08);border-radius:12px;padding:14px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:#2563EB;" id="summaryPending">0</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px;">待取餐</div>
+            </div>
+            <div style="background:rgba(245,158,11,0.08);border-radius:12px;padding:14px;text-align:center;">
+              <div style="font-size:28px;font-weight:800;color:#D97706;" id="summaryDelivering">0</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px;">配送中</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- 右：订单列表 -->
+    <div class="orders-list-col" style="padding:20px 20px 20px 8px;">
+      <div class="card" style="height:100%;">
+        <div class="card-hd">
+          <div class="card-title">全部订单</div>
+          <div class="card-chip" id="orderChip" style="background:rgba(124,58,237,0.12);color:#7C3AED;">0 单</div>
+        </div>
+        <div class="card-body" style="height:calc(100% - 54px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(30,20,60,0.15) transparent;">
+          <div class="order-list" id="orderList">
+            <div class="order-empty">暂无配送任务</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 3: 温度监控 -->
+  <div id="page-temp" class="page" style="overflow:hidden;">
+    <div style="padding:20px 20px 10px; flex-shrink:0;">
+      <div class="device-section-title">🌡️ 箱体温度监控</div>
+      <div style="font-size:13px;color:var(--w2);margin-top:6px;">实时显示外卖箱四角温度</div>
+    </div>
+    <div class="temp-main-grid" style="padding:0 20px 20px; flex:1; min-height:0;">
+      <!-- FL -->
+      <div class="tcard fl" id="tcardFL">
+        <span class="tcard-icon">🌡️</span>
+        <div class="tcard-val" id="tempFL">--<span class="u">°C</span></div>
+        <div class="tcard-label">前左角 FL</div>
+        <div class="tcard-bar"><div class="tcard-bar-fill" id="tempBarFL" style="width:0%"></div></div>
+      </div>
+      <!-- FR -->
+      <div class="tcard fr" id="tcardFR">
+        <span class="tcard-icon">🌡️</span>
+        <div class="tcard-val" id="tempFR">--<span class="u">°C</span></div>
+        <div class="tcard-label">前右角 FR</div>
+        <div class="tcard-bar"><div class="tcard-bar-fill" id="tempBarFR" style="width:0%"></div></div>
+      </div>
+      <!-- BL -->
+      <div class="tcard bl" id="tcardBL">
+        <span class="tcard-icon">🌡️</span>
+        <div class="tcard-val" id="tempBL">--<span class="u">°C</span></div>
+        <div class="tcard-label">后左角 BL</div>
+        <div class="tcard-bar"><div class="tcard-bar-fill" id="tempBarBL" style="width:0%"></div></div>
+      </div>
+      <!-- BR -->
+      <div class="tcard br" id="tcardBR">
+        <span class="tcard-icon">🌡️</span>
+        <div class="tcard-val" id="tempBR">--<span class="u">°C</span></div>
+        <div class="tcard-label">后右角 BR</div>
+        <div class="tcard-bar"><div class="tcard-bar-fill" id="tempBarBR" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE 4: 设备状态 -->
+  <div id="page-device" class="page" style="overflow:hidden;">
+    <div style="padding:20px 20px 10px; flex-shrink:0;">
+      <div class="device-section-title">⚙️ 设备状态</div>
+      <div style="font-size:13px;color:var(--w2);margin-top:6px;">硬件连接与传感器实时状态</div>
+    </div>
+    <div class="device-grid" style="padding:0 20px; flex-shrink:0;">
+      <!-- 外卖锁 -->
+      <div class="dcard ok" id="dcardTheft">
+        <div class="dcard-top">
+          <div class="dcard-icon-box">🔒</div>
+          <div class="dcard-badge ok" id="antiTheftBadge">已锁</div>
+        </div>
+        <div>
+          <div class="dcard-name">外卖锁状态</div>
+          <div class="dcard-val" id="antiTheftVal">已锁</div>
+        </div>
+      </div>
+      <!-- 跌倒 -->
+      <div class="dcard ok" id="dcardFall">
+        <div class="dcard-top">
+          <div class="dcard-icon-box">🏃</div>
+          <div class="dcard-badge ok" id="fallBadge">正常</div>
+        </div>
+        <div>
+          <div class="dcard-name">跌倒检测</div>
+          <div class="dcard-val" id="fallVal">正常</div>
+        </div>
+      </div>
+      <!-- MQTT -->
+      <div class="dcard neutral" id="dcardMqtt">
+        <div class="dcard-top">
+          <div class="dcard-icon-box">📡</div>
+          <div class="dcard-badge neutral" id="mqttBadge">连接中</div>
+        </div>
+        <div>
+          <div class="dcard-name">MQTT 连接</div>
+          <div class="dcard-val" id="mqttVal">连接中</div>
+        </div>
+      </div>
+      <!-- 骑手 -->
+      <div class="dcard ok" id="dcardRider">
+        <div class="dcard-top">
+          <div class="dcard-icon-box">🛵</div>
+          <div class="dcard-badge ok" id="riderBadge">在线</div>
+        </div>
+        <div>
+          <div class="dcard-name">骑手状态</div>
+          <div class="dcard-val" id="riderVal">在线</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<!-- ===== Footer ===== -->
+<div class="ft">
+  <div class="fitem"><span>🕐</span><span>更新</span><span class="fval" id="lastUpdate">--</span></div>
+  <div class="fitem"><span>🌡️</span><span>平均温</span><span class="fval" id="envTemp">--°C</span></div>
+  <div class="fitem"><span>💨</span><span>速度</span><span class="fval" id="footerSpeed">-- m/s</span></div>
+</div>
+
+<script>
+// ===== 页面切换 =====
+var pageInfo={
+  map:    {title:'实时地图',    sub:'骑手追踪 · 配送概览'},
+  orders: {title:'订单管理',   sub:'新建订单 · 配送跟踪'},
+  temp:   {title:'温度监控',   sub:'箱体四角实时温度'},
+  device: {title:'设备状态',   sub:'硬件连接与传感器'}
+}
+
+function switchPage(id, el) {
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active') })
+  document.querySelectorAll('.sb-item').forEach(function(i){ i.classList.remove('active') })
+  var p=document.getElementById('page-'+id); if(p) p.classList.add('active')
+  if(el) el.classList.add('active')
+  var info=pageInfo[id]||{}
+  document.getElementById('hdTitle').textContent=info.title||''
+  document.getElementById('hdSub').textContent=info.sub||''
+  if(id==='map' && typeof map!=='undefined') setTimeout(function(){map.resize()},50)
+}
+
+// ===== 地图 =====
+var map=new AMap.Map('map',{zoom:15,center:[112.216000,30.334000],mapStyle:'amap://styles/fresh'})
+var riderMarker=new AMap.Marker({
+  position:[112.215560,30.335483],
+  content:'<div style="font-size:28px;transform:translate(-50%,-50%);filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))">🛵</div>',
+  offset:new AMap.Pixel(0,0)
+})
+riderMarker.setMap(map)
+
+// ===== 骑手标记平滑移动：记录当前显示坐标，requestAnimationFrame插值 =====
+var _rLng = 112.215560, _rLat = 30.335483  // 当前屏幕上显示的骑手位置
+var _rAnimFrame = null                       // rAF句柄
+
+var destMarkers=[]
+
+// 坐标碰撞计数：key="lng,lat" → 已放置数量，用于计算圆形分散偏移
+// 偏移半径约 30m（0.00027°），按 360/n 均匀散开，让叠在同一点的标记都可见
+function _spreadOffset(posKey, posMap) {
+  var cnt = posMap[posKey] || 0
+  posMap[posKey] = cnt + 1
+  if (cnt === 0) return [0, 0]                          // 第一个，不偏移
+  var R = 0.00027                                        // ~30米
+  var angle = (cnt * 137.5) * Math.PI / 180            // 黄金角分布，避免规律性重叠
+  return [R * Math.cos(angle), R * Math.sin(angle)]    // [dLng, dLat]
+}
+
+function refreshMapMarkers(){
+  destMarkers.forEach(function(m){m.setMap(null)}); destMarkers=[]
+  var posMap = {}   // 记录各坐标已放了几个标记
+  orders.forEach(function(o,i){
+    if(o.status==='completed') return
+
+    // 取餐标记
+    var sk = (o.shopLng||112.216).toFixed(5)+','+(o.shopLat||30.334).toFixed(5)
+    var sd = _spreadOffset(sk, posMap)
+    var m1=new AMap.Marker({position:[+(o.shopLng||112.216)+sd[0], +(o.shopLat||30.334)+sd[1]],
+      content:'<div style="background:linear-gradient(135deg,#F59E0B,#FCD34D);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;transform:translate(-50%,-50%);box-shadow:0 2px 10px rgba(245,158,11,0.5);border:2px solid rgba(255,255,255,0.8)">取</div>',
+      offset:new AMap.Pixel(0,0)})
+    m1.setMap(map)
+    var iw1=new AMap.InfoWindow({content:'<div style="padding:8px 12px;font-size:13px;font-family:-apple-system,sans-serif"><b>'+o.foodName+'</b><br><span style="color:#888;font-size:11px">取：'+o.shopName+'</span></div>',offset:new AMap.Pixel(0,-22)})
+    m1.on('click',function(){iw1.open(map,m1.getPosition())}); destMarkers.push(m1)
+
+    // 送达标记
+    var dk = (o.addrLng||112.220).toFixed(5)+','+(o.addrLat||30.332).toFixed(5)
+    var dd = _spreadOffset(dk, posMap)
+    var m2=new AMap.Marker({position:[+(o.addrLng||112.220)+dd[0], +(o.addrLat||30.332)+dd[1]],
+      content:'<div style="background:linear-gradient(135deg,#3B82F6,#60A5FA);color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;transform:translate(-50%,-50%);box-shadow:0 2px 10px rgba(59,130,246,0.5);border:2px solid rgba(255,255,255,0.8)">'+(i+1)+'</div>',
+      offset:new AMap.Pixel(0,0)})
+    m2.setMap(map)
+    var iw2=new AMap.InfoWindow({content:'<div style="padding:8px 12px;font-size:13px;font-family:-apple-system,sans-serif"><b>'+o.foodName+'</b><br><span style="color:#888;font-size:11px">送：'+o.address+'</span></div>',offset:new AMap.Pixel(0,-22)})
+    m2.on('click',function(){iw2.open(map,m2.getPosition())}); destMarkers.push(m2)
+  })
+}
+
+// ===== 时钟 =====
+setInterval(function(){
+  var t=new Date(),h=String(t.getHours()).padStart(2,'0'),m=String(t.getMinutes()).padStart(2,'0'),s=String(t.getSeconds()).padStart(2,'0')
+  var str=h+':'+m+':'+s
+  document.getElementById('clockText').textContent=str
+  document.getElementById('lastUpdate').textContent=str
+},1000)
+
+// ===== 温度 =====
+var CNAMES={'FL':'前左角','FR':'前右角','BL':'后左角','BR':'后右角'}
+var DC={'FL':'fl','FR':'fr','BL':'bl','BR':'br'}
+var _tv={}
+
+function updateTemp(slot,val){
+  var el=document.getElementById('temp'+slot), bar=document.getElementById('tempBar'+slot)
+  var card=document.getElementById('tcard'+slot), stat=document.getElementById('tstat'+slot)
+  if(!el) return
+  // 有效温度才更新；无效值（0或负数）时保持上次显示，不回退到"--"
+  if(val > 0){
+    _tv[slot]=val
+    el.innerHTML=val.toFixed(1)+'<span class="u">°C</span>'
+    bar.style.width=Math.min(100,(val/80)*100)+'%'
+    var vals=Object.values(_tv).filter(function(v){return v>0})
+    if(vals.length>0){
+      var avg=(vals.reduce(function(a,b){return a+b},0)/vals.length).toFixed(1)
+      document.getElementById('envTemp').textContent=avg+'°C'
+      document.getElementById('statMinTemp').innerHTML=avg+' <span style="font-size:13px;opacity:0.7">°C</span>'
+      var minTempChip=document.getElementById('minTempChip'); if(minTempChip) minTempChip.textContent='平均 '+avg+'°C'
+    }
+  }
+}
+
+// ===== 报警 =====
+function showAlarm(title,desc){
+  document.getElementById('alarmTitle').textContent=title
+  document.getElementById('alarmDesc').textContent=desc
+  document.getElementById('alarmBanner').classList.add('show')
+}
+function closeAlarm(){ document.getElementById('alarmBanner').classList.remove('show') }
+
+// 跌倒专属全屏警报
+function showFallOverlay(){
+  document.getElementById('fallTime').textContent='发生时间：'+new Date().toLocaleTimeString()
+  document.getElementById('fallOverlay').classList.add('show')
+}
+function closeFallOverlay(){
+  document.getElementById('fallOverlay').classList.remove('show')
+  // 同步重置跌倒状态卡片
+  setDcard('dcardFall','ok','正常','正常','fallVal','fallBadge')
+}
+
+// ===== 网页侧速度计算（1分钟滑动窗口位移/时间）=====
+// 保留最近60秒的GPS轨迹点，用最老的点到当前点的直线位移除以时间差
+// 比相邻两点瞬时速度更稳定，不受单次GPS抖动影响
+var _posHistory = []  // [{lng, lat, t}]，滑动窗口
+var SPEED_WINDOW = 60000  // 60秒窗口（毫秒）
+function _haversine(lng1, lat1, lng2, lat2) {
+  var R = 6371000
+  var dLat = (lat2 - lat1) * Math.PI / 180
+  var dLng = (lng2 - lng1) * Math.PI / 180
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*
+          Math.sin(dLng/2)*Math.sin(dLng/2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+}
+function _calcSpeedFromPos(lng, lat) {
+  var now = Date.now()
+  // 新点入队
+  _posHistory.push({lng: lng, lat: lat, t: now})
+  // 清掉60秒前的旧点
+  while (_posHistory.length > 1 && now - _posHistory[0].t > SPEED_WINDOW) {
+    _posHistory.shift()
+  }
+  // 至少需要2个点才能算速度
+  if (_posHistory.length < 2) return 0
+  // 用窗口内最老的点到当前点：位移 ÷ 时间
+  var oldest = _posHistory[0]
+  var dt = (now - oldest.t) / 1000  // 秒
+  if (dt < 1) return 0
+  var dist = _haversine(oldest.lng, oldest.lat, lng, lat)
+  return Math.min(dist / dt, 20)  // 限制最大20m/s（72km/h）过滤异常
+}
+
+// ===== 骑手位置（requestAnimationFrame插值，60fps丝滑平移）=====
+function updateRiderPos(lng, lat) {
+  // 取消上一帧动画
+  if (_rAnimFrame) { cancelAnimationFrame(_rAnimFrame); _rAnimFrame = null }
+
+  // 用位移/时间计算速度，更新三处速度显示
+  var spd = _calcSpeedFromPos(lng, lat)
+  var spdStr = spd.toFixed(2)
+  document.getElementById('speedText').textContent  = spdStr + ' m/s'
+  document.getElementById('footerSpeed').textContent = spdStr + ' m/s'
+  document.getElementById('statSpeed').innerHTML     = spdStr + ' <span style="font-size:13px;opacity:0.7">m/s</span>'
+
+  var fromLng = _rLng, fromLat = _rLat
+  var startTime = null
+  var DURATION  = 500  // ms，快速平滑移动，每秒1次数据到来时动画已完成
+
+  function frame(now) {
+    if (!startTime) startTime = now
+    var t    = Math.min((now - startTime) / DURATION, 1)
+    var ease = 1 - Math.pow(1 - t, 3)  // ease-out cubic
+
+    var curLng = fromLng + (lng - fromLng) * ease
+    var curLat = fromLat + (lat - fromLat) * ease
+    riderMarker.setPosition([curLng, curLat])
+    _rLng = curLng; _rLat = curLat
+
+    if (t < 1) {
+      _rAnimFrame = requestAnimationFrame(frame)
+    } else {
+      _rLng = lng; _rLat = lat
+      _rAnimFrame = null
+    }
+  }
+
+  _rAnimFrame = requestAnimationFrame(frame)
+  document.getElementById('coordText').textContent = lat.toFixed(5) + ', ' + lng.toFixed(5)
+  setDcard('dcardRider','ok','在线','在线','riderVal','riderBadge')
+}
+
+// ===== 设备卡 =====
+function setDcard(cardId,state,val,badge,valId,badgeId){
+  var dc=document.getElementById(cardId); if(dc) dc.className='dcard '+state
+  var vEl=document.getElementById(valId); if(vEl) vEl.textContent=val
+  var bEl=document.getElementById(badgeId); if(bEl){ bEl.textContent=badge; bEl.className='dcard-badge '+state }
+}
+
+// ===== 订单 =====
+var orders=[
+  {id:'ORD001',foodName:'文具盒',clipId:'01',shopName:'万品汇',shopLat:30.331942,shopLng:112.215558,address:'主教',addrLat:30.332095,addrLng:112.213667,deadline:Date.now()+30*60*1000,createdAt:Date.now()-3*60*1000,  status:'pending_pickup'},
+  {id:'ORD002',foodName:'充电宝',clipId:'02',shopName:'主教',  shopLat:30.332095,shopLng:112.213667,address:'13教',addrLat:30.332700,addrLng:112.210300,deadline:Date.now()+28*60*1000,createdAt:Date.now()-2*60*1000,  status:'pending_pickup'},
+  {id:'ORD003',foodName:'水瓶',  clipId:'03',shopName:'13教', shopLat:30.332700,shopLng:112.210300,address:'7教', addrLat:30.333024,addrLng:112.213930,deadline:Date.now()+25*60*1000,createdAt:Date.now()-1*60*1000,  status:'pending_pickup'},
+  {id:'ORD004',foodName:'手机壳',clipId:'04',shopName:'7教',  shopLat:30.333024,shopLng:112.213930,address:'万品汇',addrLat:30.331942,addrLng:112.215558,deadline:Date.now()+22*60*1000,createdAt:Date.now()-0.5*60*1000,status:'pending_pickup'}
+]
+
+function renderOrders(){
+  var list=document.getElementById('orderList'), chip=document.getElementById('orderChip')
+  var active=orders.filter(function(o){return o.status!=='completed'})
+  if(chip) chip.textContent=active.length+' 单'
+  var badge=document.getElementById('sbBadgeOrders'); if(badge) badge.textContent=active.length
+  document.getElementById('statOrders').textContent=active.length
+  var pen=orders.filter(function(o){return o.status==='pending_pickup'}).length
+  var del=orders.filter(function(o){return o.status==='delivering'||o.status==='arriving'}).length
+  var sp=document.getElementById('summaryPending'); if(sp) sp.textContent=pen
+  var sd=document.getElementById('summaryDelivering'); if(sd) sd.textContent=del
+  if(active.length===0){list.innerHTML='<div class="order-empty">✓ 所有订单已完成</div>'; return}
+  list.innerHTML=active.map(function(o){
+    var rem=Math.floor((o.deadline-Date.now())/1000), abs=Math.abs(rem), ov=rem<0
+    var ts=(ov?'超时 +':'')+Math.floor(abs/60)+':'+String(abs%60).padStart(2,'0')
+    var sl={pending_pickup:'待取餐',delivering:'配送中',arriving:'即将到达',completed:'已送达'}[o.status]||o.status
+    var sc=o.status==='pending_pickup'?'p':o.status==='completed'?'c':o.status==='arriving'?'v':'a'
+    var nc=o.status==='pending_pickup'?'p':o.status==='arriving'?'v':o.status==='completed'?'d':'a'
+    var tgt=o.status!=='pending_pickup'?'<span class="rtag d">送</span>'+o.address:'<span class="rtag p">取</span>'+o.shopName
+    var ac=''
+    if(o.status!=='completed') ac+='<button class="bxs u" onclick="urgeOrder(\''+o.id+'\')">📢 催单</button>'
+    if(o.status==='pending_pickup') ac+='<button class="bxs n" onclick="advanceStatus(\''+o.id+'\',\'delivering\')">✓ 已取餐</button>'
+    if(o.status==='delivering'||o.status==='arriving') ac+='<button class="bxs n" onclick="advanceStatus(\''+o.id+'\',\'completed\')">✓ 已送达</button>'
+    ac+='<button class="bxs x" onclick="deleteOrder(\''+o.id+'\')">删除</button>'
+    return '<div class="oitem"><div class="onum '+nc+'">'+o.clipId+'</div><div class="oinfo"><div class="ofood">'+o.foodName+'</div><div class="oroute">'+tgt+'</div><div class="otimer'+(ov?' ov':'')+'">⏱ '+ts+'</div></div><div class="oright"><span class="obadge '+sc+'">'+sl+'</span><div class="oacts">'+ac+'</div></div></div>'
+  }).join('')
+}
+setInterval(renderOrders,1000); renderOrders(); refreshMapMarkers()
+
+function addOrder(){
+  var food=document.getElementById('iFood').value.trim()
+  var shopEl=document.getElementById('iShop'), addrEl=document.getElementById('iAddr')
+  var shopOpt=shopEl.options[shopEl.selectedIndex], addrOpt=addrEl.options[addrEl.selectedIndex]
+  if(!food||!shopOpt.value||!addrOpt.value){alert('请填写餐品名称，并选择取餐店和送达地点！');return}
+  var used=orders.filter(function(o){return o.status!=='completed'}).map(function(o){return o.clipId})
+  var free=['01','02','03','04'].find(function(c){return used.indexOf(c)===-1})
+  if(!free){alert('所有夹子均已被占用！');return}
+  var mins=parseInt(document.getElementById('iMins').value)||30
+  orders.push({id:'ORD'+String(Date.now()).slice(-6),foodName:food,shopName:shopOpt.value,address:addrOpt.value,
+    shopLat:parseFloat(shopOpt.dataset.lat),shopLng:parseFloat(shopOpt.dataset.lng),
+    addrLat:parseFloat(addrOpt.dataset.lat),addrLng:parseFloat(addrOpt.dataset.lng),
+    deadline:Date.now()+mins*60*1000,createdAt:Date.now(),status:'pending_pickup',clipId:free})
+  document.getElementById('iFood').value=''; shopEl.selectedIndex=0; addrEl.selectedIndex=0; document.getElementById('iMins').value=''
+  renderOrders(); refreshMapMarkers(); publishOrders()
+}
+
+function urgeOrder(id){
+  var o=orders.find(function(x){return x.id===id}); if(!o||!mqttClient) return
+  mqttClient.publish(PREFIX+'/urge',JSON.stringify({orderId:o.id,foodName:o.foodName,message:'请加快配送速度！'}),{qos:1})
+  showAlarm('📢 催单已发送','已向骑手发送催单：'+o.foodName); setTimeout(closeAlarm,3000)
+}
+
+function advanceStatus(id,ns){
+  var o=orders.find(function(x){return x.id===id}); if(!o) return
+  o.status=ns
+  if(mqttClient) mqttClient.publish(PREFIX+'/status',JSON.stringify({orderId:o.id,status:ns,source:'admin'}))
+  if(ns==='completed'){setTimeout(function(){orders=orders.filter(function(x){return x.id!==id});publishOrders();renderOrders();refreshMapMarkers()},3000)}
+  publishOrders(); renderOrders()
+}
+
+function deleteOrder(id){
+  orders=orders.filter(function(o){return o.id!==id}); renderOrders(); refreshMapMarkers(); publishOrders()
+}
+
+function publishOrders(){
+  if(!mqttClient||!mqttClient.connected) return
+  mqttClient.publish(PREFIX+'/orders',JSON.stringify({orders:orders.map(function(o,i){
+    return{id:o.id,sortOrder:i+1,foodName:o.foodName,shopName:o.shopName,shopLat:o.shopLat,shopLng:o.shopLng,
+      address:o.address,addrLat:o.addrLat,addrLng:o.addrLng,deadline:o.deadline,createdAt:o.createdAt,status:o.status,clipId:o.clipId}
+  })}),{retain:true,qos:1})
+}
+
+// ===== MQTT =====
+var mqttClient=null, BROKER_URL='wss://broker.emqx.io:8084/mqtt', PREFIX='helmet_dxk'
+
+function connectMQTT(){
+  mqttClient=mqtt.connect(BROKER_URL,{clientId:'admin_'+Math.random().toString(16).slice(2,8),keepalive:20,reconnectPeriod:2000,connectTimeout:8000,clean:true})
+  mqttClient.on('connect',function(){
+    document.getElementById('mqttPill').className='mqtt-pill on'
+    document.getElementById('mqttDot').className='sdot pulse'
+    document.getElementById('mqttText').textContent='MQTT 已连接'
+    document.getElementById('sbDot').className='sb-status-dot'
+    document.getElementById('sbStatus').textContent='MQTT 已连接'
+    document.getElementById('statConn').textContent='已连接'
+    setDcard('dcardMqtt','ok','已连接','已连接','mqttVal','mqttBadge')
+    mqttClient.subscribe(PREFIX+'/sensor'); mqttClient.subscribe(PREFIX+'/location')
+    mqttClient.subscribe(PREFIX+'/status'); mqttClient.subscribe(PREFIX+'/alert'); mqttClient.subscribe(PREFIX+'/nfc')
+    setTimeout(publishOrders,500)
+  })
+  mqttClient.on('message',function(topic,payload,packet){
+    // retain=true 说明是broker缓存的旧消息（昨晚/上次的数据），直接丢弃
+    // retain=false 才是APP实时发来的新数据
+    if(packet&&packet.retain) return
+    try{handleMsg(topic,JSON.parse(payload.toString()))}catch(e){}
+  })
+  mqttClient.on('close',function(){
+    document.getElementById('mqttPill').className='mqtt-pill re'
+    document.getElementById('mqttDot').className='sdot'
+    document.getElementById('mqttText').textContent='重连中…'
+    document.getElementById('sbDot').className='sb-status-dot off'
+    document.getElementById('sbStatus').textContent='重连中…'
+    document.getElementById('statConn').textContent='重连中'
+    setDcard('dcardMqtt','warn','重连中','重连中','mqttVal','mqttBadge')
+  })
+  mqttClient.on('error',function(){})
+}
+
+function handleMsg(topic,data){
+  if(topic===PREFIX+'/sensor'){
+    ['FL','FR','BL','BR'].forEach(function(k){if(data[k]!==undefined) updateTemp(k,data[k])})
+    if(data.temperatures) Object.keys(data.temperatures).forEach(function(k){updateTemp(k,data.temperatures[k])})
+  }
+  if(topic===PREFIX+'/location'){
+    // 速度由 updateRiderPos 内部用位移/时间自行计算，不再使用硬件上报的speed字段
+    if(data.lng&&data.lat) updateRiderPos(data.lng,data.lat)
+  }
+  if(topic===PREFIX+'/status'){
+    if(data.orderId&&data.status){
+      var o=orders.find(function(x){return x.id===data.orderId})
+      if(o){
+        o.status=data.status
+        if(data.clipId) o.clipId_bound=data.clipId
+        if(data.status==='completed'){setTimeout(function(){orders=orders.filter(function(x){return x.id!==data.orderId});renderOrders();refreshMapMarkers()},3000)}
+        renderOrders()
+      }
+    }
+  }
+  if(topic===PREFIX+'/alert'){
+    if(data.type==='theft'){ setDcard('dcardTheft','alarm','报警！','报警','antiTheftVal','antiTheftBadge'); showAlarm('🔒 外卖锁报警','检测到外卖锁异常开启！') }
+    if(data.type==='fall'){  setDcard('dcardFall','alarm','跌倒！','跌倒','fallVal','fallBadge'); showFallOverlay() }  // 跌倒：全屏专属警报
+    if(data.type==='reset'){ setDcard('dcardTheft','ok','已锁','已锁','antiTheftVal','antiTheftBadge'); setDcard('dcardFall','ok','正常','正常','fallVal','fallBadge'); closeAlarm() }
+  }
+  if(topic===PREFIX+'/nfc'){
+    var cid=data.cardId||'?', act=(data.action||'').toUpperCase()
+    if(act==='BIND'){showAlarm('📦 NFC 取餐',cid+' 号夹子刷卡取餐');setTimeout(closeAlarm,3000)}
+    else if(act==='UNBIND'){showAlarm('✅ NFC 送达',cid+' 号夹子刷卡送达');setTimeout(closeAlarm,3000)}
+  }
+}
+
+connectMQTT()
+
+// ===== 登录逻辑 =====
+function doLogin() {
+  var u = document.getElementById('loginUser').value.trim()
+  var p = document.getElementById('loginPass').value.trim()
+  if (!u || !p) {
+    document.getElementById('loginUser').focus()
+    return
+  }
+  document.getElementById('loginMask').classList.add('hidden')
+}
+</script>
+</body>
+</html>
