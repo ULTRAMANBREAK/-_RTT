@@ -37,3 +37,27 @@ sdkconfig.old
 # HBuilderX
 unpackage/
 APP/HBuilderX/
+
+# RT-Thread / Keil / Python build artifacts
+__pycache__/
+*.pyc
+Debug/
+outputs/
+*.uvguix.*
+*.uvopt
+*.uvoptx
+*.axf
+*.hex
+*.bin
+*.map
+*.htm
+*.dep
+*.crf
+*.d
+*.o
+*.lst
+*.i
+*.iex
+*.lnp
+*.build_log.htm
+

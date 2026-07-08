@@ -1,0 +1,37 @@
+from building import *
+import os
+
+cwd = GetCurrentDir()
+CPPPATH = [cwd]
+src = Glob('*.c')
+
+modules = [
+    'app_startup',
+    'config',
+    'storage',
+    'esp32',
+    'gps',
+    'uart4_bus',
+    'sensors',
+    'display',
+    'devices',
+]
+
+for module in modules:
+    src_path = os.path.join(cwd, module, 'src')
+    inc_path = os.path.join(cwd, module, 'inc')
+
+    if os.path.isdir(src_path):
+        src += Glob(os.path.join(module, 'src', '*.c'))
+
+    if os.path.isdir(inc_path):
+        CPPPATH.append(inc_path)
+
+group = DefineGroup('Applications', src, depend = [''], CPPPATH = CPPPATH)
+
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        group = group + SConscript(os.path.join(item, 'SConscript'))
+
+Return('group')
